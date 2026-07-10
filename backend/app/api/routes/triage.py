@@ -20,7 +20,11 @@ from app.services.triage import TriageService
 router = APIRouter(prefix="/triage", tags=["triage"])
 
 
-@router.post("", response_model=ApiResponse[TriageRead], status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ApiResponse[TriageRead],
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_triage_record(
     payload: TriageCreate,
     service: Annotated[TriageService, Depends(get_triage_service)],

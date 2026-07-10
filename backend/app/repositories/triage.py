@@ -1,5 +1,6 @@
 """Repository objects that isolate database access from business services."""
 
+from typing import Any
 from uuid import UUID
 
 import structlog
@@ -68,7 +69,7 @@ class TriageRepository:
             query.order_by(sort_column).offset((page - 1) * page_size).limit(page_size)
         )
         total = await self.session.scalar(count_query)
-        return list(result), total or 0
+        return list(result), int(total or 0)
 
     async def update(self, record: TriageRecord, payload: TriageUpdate) -> TriageRecord:
         """Apply a partial update to an existing triage record."""
@@ -89,12 +90,12 @@ class TriageRepository:
 
     def _with_filters(
         self,
-        query: Select[tuple[TriageRecord]],
+        query: Select[Any],
         *,
         priority: int | None,
         status: TriageStatus | None,
         synced: bool | None,
-    ) -> Select[tuple[TriageRecord]]:
+    ) -> Select[Any]:
         """Apply optional list filters to a SQLAlchemy select statement."""
 
         if priority is not None:

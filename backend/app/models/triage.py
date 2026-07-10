@@ -1,10 +1,19 @@
 """SQLAlchemy models for triage intake records."""
 
-import enum
 from datetime import UTC, datetime
+from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, Index, Integer, String, Text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Enum,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -16,7 +25,7 @@ def utc_now() -> datetime:
     return datetime.now(UTC)
 
 
-class TriageStatus(str, enum.Enum):
+class TriageStatus(StrEnum):
     """Patient transport workflow states supported by the intake form."""
 
     pending = "Pending"
@@ -37,11 +46,19 @@ class TriageRecord(Base):
     condition_description: Mapped[str] = mapped_column(Text, nullable=False)
     priority: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     status: Mapped[TriageStatus] = mapped_column(
-        Enum(TriageStatus, values_callable=lambda enum_: [item.value for item in enum_]),
+        Enum(
+            TriageStatus,
+            values_callable=lambda enum_: [item.value for item in enum_],
+        ),
         nullable=False,
         index=True,
     )
-    synced: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    synced: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

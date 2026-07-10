@@ -64,7 +64,11 @@ class TriageService:
             raise NotFoundError("Triage record")
         return record
 
-    async def update_record(self, record_id: UUID, payload: TriageUpdate) -> TriageRecord:
+    async def update_record(
+        self,
+        record_id: UUID,
+        payload: TriageUpdate,
+    ) -> TriageRecord:
         """Update a triage record after confirming it exists."""
 
         record = await self.get_record(record_id)
