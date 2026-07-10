@@ -78,10 +78,31 @@ Install and run:
 ```bash
 cd mobile
 npm install
-EXPO_PUBLIC_API_URL=http://localhost:8000 npm start
+npm start
 ```
 
-For Android emulator, use `http://10.0.2.2:8000` instead of `localhost`.
+The mobile app defaults to a self-contained mock API mode so the offline-first
+queue can be reviewed without running a backend:
+
+```bash
+EXPO_PUBLIC_API_MODE=mock npm start
+```
+
+Mock uploads wait 2 seconds to simulate a real network request. To demonstrate
+retry behavior, opt into random mock failures:
+
+```bash
+EXPO_PUBLIC_API_MODE=mock EXPO_PUBLIC_MOCK_FAILURE_RATE=0.25 npm start
+```
+
+To use the included FastAPI backend instead:
+
+```bash
+EXPO_PUBLIC_API_MODE=http EXPO_PUBLIC_API_URL=http://localhost:8000 npm start
+```
+
+For Android emulator with the backend, use `http://10.0.2.2:8000` instead of
+`localhost`.
 
 Run tests:
 
@@ -120,10 +141,47 @@ is pinned to that version to avoid Expo Go compatibility warnings.
 ## Offline-First Flow
 
 1. The paramedic submits a triage record.
-2. The app writes the record to SQLite immediately with `syncState = pending`.
+2. The app writes the record to SQLite immediately with `syncState = pending`;
+   submission success does not depend on internet connectivity.
 3. The UI updates from Redux without waiting for the network.
 4. The sync worker listens for network restoration through NetInfo.
-5. When connectivity is available, queued records are uploaded to the FastAPI backend.
-6. Successful records are marked `synced`; failures remain locally available for retry.
+5. The sync worker also runs when the app returns to the foreground through
+   AppState, which covers device lifecycle changes during field use.
+6. When connectivity is available, queued records are uploaded in the background
+   to either the local mock API or `POST /api/v1/triage`.
+7. The upload loop is guarded so only one sync pass runs at a time.
+8. Failed uploads are marked `failed` with the error message and are picked up
+   again by the next connectivity or foreground sync pass.
+9. Successful records are marked `synced` and store the returned remote ID.
 
-This design prevents data loss when cellular coverage is unstable and keeps the UI responsive during background synchronization.
+This design prevents data loss when cellular coverage is unstable and keeps the
+UI responsive during background synchronization.
+
+## Assessment Checklist
+
+- **Single-screen intake:** patient name, condition description, priority 1-5,
+  and status (`Pending`, `In-Transit`) are captured on one screen.
+- **Validation:** blank text fields are rejected and priority/status values are
+  constrained with Zod and React Hook Form.
+- **Critical visual treatment:** priority 1 and 2 use high-visibility red/orange
+  styling in the selector and recent intake list.
+- **Offline interception:** submit always writes to SQLite first; offline devices
+  queue records instead of showing a generic network error.
+- **Local persistence:** Expo SQLite stores queued, syncing, failed, and synced
+  records on device.
+- **Background queue:** NetInfo and AppState trigger automatic retry when
+  connectivity returns or the app becomes active.
+- **State management:** Redux Toolkit owns UI state while database and sync code
+  live outside the screen component.
+- **Testing:** mobile unit tests cover validation and API mapping; backend tests
+  cover API behavior.
+
+## Demo Video Script
+
+1. Start the app in mock mode with `npm start`.
+2. Enable Airplane Mode on the device.
+3. Submit a priority 1 or 2 record and show that it appears immediately as
+   safely queued.
+4. Disable Airplane Mode.
+5. Wait for the banner/list to show the record automatically transition to
+   synchronized without tapping a retry button.

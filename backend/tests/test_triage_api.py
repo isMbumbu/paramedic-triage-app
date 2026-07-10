@@ -31,6 +31,25 @@ async def test_create_and_list_triage_record(client):
 
 
 @pytest.mark.asyncio
+async def test_create_triage_record_with_assessment_api_prefix(client):
+    """The assessment-specified /api/v1/triage path should be supported."""
+
+    response = await client.post(
+        "/api/v1/triage",
+        json={
+            "patient_name": "Njeri Kamau",
+            "condition_description": "Reduced level of consciousness",
+            "priority": 1,
+            "status": "Pending",
+            "synced": True,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["data"]["patient_name"] == "Njeri Kamau"
+
+
+@pytest.mark.asyncio
 async def test_rejects_invalid_priority(client):
     """The API should reject priorities outside the 1-5 triage range."""
 

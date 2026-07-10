@@ -19,7 +19,7 @@ import { SyncBanner } from "../components/SyncBanner";
 import { initializeDatabase, insertLocalRecord, listRecords } from "../database/triageDatabase";
 import { useSyncWorker } from "../hooks/useSyncWorker";
 import { syncPendingRecords } from "../services/sync/syncService";
-import { addRecord, setRecords } from "../store/triageSlice";
+import { addRecord, setRecords, setSyncing } from "../store/triageSlice";
 import { AppDispatch, RootState } from "../store/store";
 import { TriageFormValues } from "../types/triage";
 import { triageSchema } from "../utils/triageValidation";
@@ -60,9 +60,14 @@ export function TriageScreen() {
     const record = await insertLocalRecord(values);
     dispatch(addRecord(record));
     reset(defaultValues);
-    void syncPendingRecords().then(async () => {
-      dispatch(setRecords(await listRecords()));
-    });
+    dispatch(setSyncing(true));
+    void syncPendingRecords()
+      .then(async () => {
+        dispatch(setRecords(await listRecords()));
+      })
+      .finally(() => {
+        dispatch(setSyncing(false));
+      });
   }
 
   const pendingCount = records.filter((record) => record.syncState === "pending").length;
