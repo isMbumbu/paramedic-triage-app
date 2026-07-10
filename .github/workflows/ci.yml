@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install backend
+        working-directory: backend
+        run: uv sync --dev
+      - name: Lint backend
+        working-directory: backend
+        run: uv run ruff check .
+      - name: Test backend
+        working-directory: backend
+        run: uv run pytest
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install mobile
+        working-directory: mobile
+        run: npm install
+      - name: Test mobile
+        working-directory: mobile
+        run: npm test -- --watchAll=false
