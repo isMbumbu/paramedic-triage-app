@@ -17,6 +17,13 @@ describe("triage API adapter", () => {
     expect(triageApiInternals.buildTriageUrl()).toBe("http://localhost:8000/api/v1/triage");
   });
 
+  it("defaults to the HTTP backend for Android emulators", () => {
+    expect(triageApiInternals.resolveApiSettings({}, "android")).toEqual({
+      apiMode: "http",
+      apiUrl: "http://10.0.2.2:8000"
+    });
+  });
+
   it("maps local records to the backend payload shape", () => {
     expect(triageApiInternals.toApiPayload(record)).toEqual({
       patient_name: "Amina Otieno",

@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import {
   KeyboardAvoidingView,
@@ -22,9 +22,26 @@ import { useSyncWorker } from "../hooks/useSyncWorker";
 import { syncPendingRecords } from "../services/sync/syncService";
 import { addRecord, setRecords, setSyncing } from "../store/triageSlice";
 import { AppDispatch, RootState } from "../store/store";
-import { TriageFormValues } from "../types/triage";
+import { TriageFormValues, TriageStatus } from "../types/triage";
 import { getPriorityStyle } from "../utils/priority";
 import { triageSchema } from "../utils/triageValidation";
+
+const statusOptions: Array<{ value: TriageStatus; label: string; helperText: string; backgroundColor: string; textColor: string }> = [
+  {
+    value: "Pending",
+    label: "Awaiting Dispatch",
+    helperText: "Still being assessed",
+    backgroundColor: "#fde68a",
+    textColor: "#92400e"
+  },
+  {
+    value: "In-Transit",
+    label: "In Transit",
+    helperText: "En route to destination",
+    backgroundColor: "#bfdbfe",
+    textColor: "#1d4ed8"
+  }
+];
 
 const defaultValues: TriageFormValues = {
   patientName: "",
@@ -33,10 +50,13 @@ const defaultValues: TriageFormValues = {
   status: "Pending"
 };
 
+type SaveFeedback = { kind: "saved-offline" | "saved-online" | "error"; message: string } | null;
+
 export function TriageScreen() {
   const dispatch = useDispatch<AppDispatch>();
   const { records, syncing } = useSelector((state: RootState) => state.triage);
   const [listTab, setListTab] = useState<"queued" | "synced">("queued");
+  const [feedback, setFeedback] = useState<SaveFeedback>(null);
   useSyncWorker();
 
   const {
@@ -58,28 +78,54 @@ export function TriageScreen() {
     void bootstrap();
   }, [dispatch]);
 
+  // Auto-dismiss the inline save confirmation so it doesn't linger stale.
+  useEffect(() => {
+    if (!feedback) return;
+    const timer = setTimeout(() => setFeedback(null), 4000);
+    return () => clearTimeout(timer);
+  }, [feedback]);
+
   async function submit(values: TriageFormValues) {
-    await initializeDatabase();
-    const record = await insertLocalRecord(values);
-    dispatch(addRecord(record));
-    reset(defaultValues);
-    dispatch(setSyncing(true));
-    void syncPendingRecords()
-      .then(async () => {
-        dispatch(setRecords(await listRecords()));
-      })
-      .finally(() => {
-        dispatch(setSyncing(false));
+    try {
+      await initializeDatabase();
+      const record = await insertLocalRecord(values);
+      dispatch(addRecord(record));
+      reset(defaultValues);
+      setFeedback({
+        kind: "saved-offline",
+        message: "Saved on device. Will sync automatically once connected."
       });
+
+      dispatch(setSyncing(true));
+      try {
+        await syncPendingRecords();
+        dispatch(setRecords(await listRecords()));
+        setFeedback({ kind: "saved-online", message: "Synced to server." });
+      } finally {
+        dispatch(setSyncing(false));
+      }
+    } catch (err) {
+      // Local persistence itself failed — this is the one case that matters most
+      // to surface clearly, since it's the failure mode the app promises never happens silently.
+      setFeedback({
+        kind: "error",
+        message: "Couldn't save this record locally. Please try again."
+      });
+    }
   }
 
-  const pendingCount = records.filter((record) => record.syncState === "pending").length;
-  const failedCount = records.filter((record) => record.syncState === "failed").length;
-  const syncedCount = records.filter((record) => record.syncState === "synced").length;
-  const syncedRecords = records.filter((record) => record.syncState === "synced");
-  const queuedRecords = records.filter((record) => record.syncState !== "synced");
+  const { pendingCount, failedCount, syncedCount, syncedRecords, queuedRecords, criticalCount } = useMemo(() => {
+    return {
+      pendingCount: records.filter((r) => r.syncState === "pending").length,
+      failedCount: records.filter((r) => r.syncState === "failed").length,
+      syncedCount: records.filter((r) => r.syncState === "synced").length,
+      syncedRecords: records.filter((r) => r.syncState === "synced"),
+      queuedRecords: records.filter((r) => r.syncState !== "synced"),
+      criticalCount: records.filter((r) => r.priority <= 2).length
+    };
+  }, [records]);
+
   const visibleRecords = listTab === "synced" ? syncedRecords : queuedRecords;
-  const criticalCount = records.filter((record) => record.priority <= 2).length;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -104,7 +150,10 @@ export function TriageScreen() {
               <Text style={styles.eyebrow}>EMKF FIELD TRIAGE</Text>
               <Text style={styles.title}>Patient Intake</Text>
             </View>
-            <View style={[styles.headerPill, criticalCount > 0 && styles.criticalPill]}>
+            <View
+              accessibilityLabel={`${criticalCount} critical cases`}
+              style={[styles.headerPill, criticalCount > 0 && styles.criticalPill]}
+            >
               <MaterialCommunityIcons color="#ffffff" name="alert" size={16} />
               <Text style={styles.criticalPillText}>{criticalCount} Critical</Text>
             </View>
@@ -117,6 +166,36 @@ export function TriageScreen() {
               syncedCount={syncedCount}
               syncing={syncing}
             />
+
+            {feedback ? (
+              <View
+                accessibilityLiveRegion="polite"
+                style={[
+                  styles.feedbackBanner,
+                  feedback.kind === "error" ? styles.feedbackError : styles.feedbackOk
+                ]}
+              >
+                <MaterialCommunityIcons
+                  color={feedback.kind === "error" ? "#b91c1c" : "#0f766e"}
+                  name={
+                    feedback.kind === "error"
+                      ? "alert-circle-outline"
+                      : feedback.kind === "saved-online"
+                        ? "cloud-check-outline"
+                        : "content-save-outline"
+                  }
+                  size={18}
+                />
+                <Text
+                  style={[
+                    styles.feedbackText,
+                    { color: feedback.kind === "error" ? "#b91c1c" : "#0f766e" }
+                  ]}
+                >
+                  {feedback.message}
+                </Text>
+              </View>
+            ) : null}
 
             <Text style={styles.label}>Patient Name</Text>
             <Controller
@@ -164,35 +243,50 @@ export function TriageScreen() {
               name="priority"
               render={({ field }) => <PrioritySelector field={field} />}
             />
+            {errors.priority ? <Text style={styles.error}>{errors.priority.message}</Text> : null}
 
             <Text style={styles.label}>Status</Text>
+            <Text style={styles.helperText}>Choose the current patient workflow state.</Text>
             <Controller
               control={control}
               name="status"
               render={({ field }) => (
-                <View style={styles.segment}>
-                  {(["Pending", "In-Transit"] as const).map((status) => (
-                    <Pressable
-                      key={status}
-                      onPress={() => field.onChange(status)}
-                      style={[styles.segmentButton, field.value === status && styles.segmentActive]}
-                    >
-                      <Text
+                <View style={styles.statusOptionsRow}>
+                  {statusOptions.map(({ value, label, helperText, backgroundColor, textColor }) => {
+                    const active = field.value === value;
+                    return (
+                      <Pressable
+                        key={value}
+                        accessibilityLabel={label}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                        onPress={() => field.onChange(value)}
                         style={[
-                          styles.segmentText,
-                          field.value === status && styles.segmentTextActive
+                          styles.statusButton,
+                          {
+                            backgroundColor: active ? backgroundColor : "#f8fafc",
+                            borderColor: backgroundColor
+                          },
+                          active && styles.statusButtonActive
                         ]}
                       >
-                        {status}
-                      </Text>
-                    </Pressable>
-                  ))}
+                        <Text style={[styles.statusText, { color: active ? textColor : "#475569" }]}>
+                          {label}
+                        </Text>
+                        <Text style={[styles.statusHelperText, { color: active ? textColor : "#64748b" }]}>
+                          {helperText}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               )}
             />
 
             <Pressable
+              accessibilityLabel="Save Triage Record"
               accessibilityRole="button"
+              accessibilityState={{ disabled: isSubmitting }}
               disabled={isSubmitting}
               onPress={handleSubmit(submit)}
               style={[styles.submitButton, isSubmitting && styles.submitDisabled]}
@@ -217,7 +311,9 @@ export function TriageScreen() {
 
             <View style={styles.listTabs}>
               <Pressable
+                accessibilityLabel="Show queued records"
                 accessibilityRole="button"
+                accessibilityState={{ selected: listTab === "queued" }}
                 onPress={() => setListTab("queued")}
                 style={[styles.listTab, listTab === "queued" && styles.listTabActive]}
               >
@@ -226,7 +322,9 @@ export function TriageScreen() {
                 </Text>
               </Pressable>
               <Pressable
+                accessibilityLabel="Show synced records"
                 accessibilityRole="button"
+                accessibilityState={{ selected: listTab === "synced" }}
                 onPress={() => setListTab("synced")}
                 style={[styles.listTab, listTab === "synced" && styles.listTabActive]}
               >
@@ -351,11 +449,38 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 14
   },
+  feedbackBanner: {
+    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10
+  },
+  feedbackOk: {
+    backgroundColor: "#f0fdfa",
+    borderColor: "#99f6e4"
+  },
+  feedbackError: {
+    backgroundColor: "#fef2f2",
+    borderColor: "#fecaca"
+  },
+  feedbackText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "700"
+  },
   label: {
     color: "#0f172a",
     fontSize: 14,
     fontWeight: "800",
     marginTop: 4
+  },
+  helperText: {
+    color: "#64748b",
+    fontSize: 12,
+    fontWeight: "700"
   },
   input: {
     backgroundColor: "#ffffff",
@@ -377,27 +502,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700"
   },
-  segment: {
-    backgroundColor: "#e5e7eb",
-    borderRadius: 8,
+  statusOptionsRow: {
     flexDirection: "row",
-    padding: 4
+    gap: 10,
+    marginTop: 6
   },
-  segmentButton: {
+  statusButton: {
     alignItems: "center",
-    borderRadius: 6,
+    borderWidth: 1,
+    borderRadius: 10,
     flex: 1,
+    justifyContent: "center",
+    minHeight: 64,
+    paddingHorizontal: 12,
     paddingVertical: 10
   },
-  segmentActive: {
-    backgroundColor: "#155e75"
+  statusButtonActive: {
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 }
   },
-  segmentText: {
-    color: "#111827",
-    fontWeight: "800"
+  statusText: {
+    fontSize: 14,
+    fontWeight: "900"
   },
-  segmentTextActive: {
-    color: "#ffffff"
+  statusHelperText: {
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 2,
+    textAlign: "center"
   },
   submitButton: {
     alignItems: "center",

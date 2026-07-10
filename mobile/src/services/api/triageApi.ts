@@ -1,7 +1,27 @@
+import { Platform } from "react-native";
+
 import { TriageRecord } from "../../types/triage";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:8000";
-const API_MODE = process.env.EXPO_PUBLIC_API_MODE ?? "mock";
+type ApiEnvironment = Record<string, string | undefined>;
+
+type ResolvedApiSettings = {
+  apiUrl: string;
+  apiMode: string;
+};
+
+export function resolveApiSettings(
+  env: ApiEnvironment = process.env,
+  platform: string = Platform.OS
+): ResolvedApiSettings {
+  const apiUrl =
+    env.EXPO_PUBLIC_API_URL ??
+    (platform === "android" ? "http://10.0.2.2:8000" : "http://localhost:8000");
+  const apiMode = env.EXPO_PUBLIC_API_MODE ?? "http";
+
+  return { apiUrl, apiMode };
+}
+
+const { apiUrl: API_URL, apiMode: API_MODE } = resolveApiSettings();
 const MOCK_DELAY_MS = Number(process.env.EXPO_PUBLIC_MOCK_DELAY_MS ?? 2000);
 const MOCK_FAILURE_RATE = Number(process.env.EXPO_PUBLIC_MOCK_FAILURE_RATE ?? 0);
 
@@ -11,8 +31,8 @@ type ApiTriageResponse = {
   };
 };
 
-function buildTriageUrl() {
-  return `${API_URL.replace(/\/$/, "")}/api/v1/triage`;
+function buildTriageUrl(baseUrl: string = API_URL) {
+  return `${baseUrl.replace(/\/$/, "")}/api/v1/triage`;
 }
 
 function toApiPayload(record: TriageRecord) {
@@ -66,5 +86,6 @@ export async function uploadTriageRecord(record: TriageRecord): Promise<string> 
 
 export const triageApiInternals = {
   buildTriageUrl,
+  resolveApiSettings,
   toApiPayload
 };

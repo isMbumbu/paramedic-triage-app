@@ -10,11 +10,11 @@ export function getPriorityStyle(priority: number) {
 
 export function getPriorityLabel(priority: number) {
   const labels: Record<number, string> = {
-    1: "1 Critical",
-    2: "2 Emergent",
-    3: "3 Urgent",
-    4: "4 Stable",
-    5: "5 Routine"
+    1: "Immediate life threat",
+    2: "High urgency",
+    3: "Needs prompt care",
+    4: "Stable / delayed",
+    5: "Routine / non-urgent"
   };
   return labels[priority];
 }
