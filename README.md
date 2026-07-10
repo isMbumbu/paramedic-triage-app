@@ -3,6 +3,9 @@
 Offline-first mobile intake app for field paramedics, with a FastAPI backend included to demonstrate the complete background synchronization workflow.
 
 ## What Is Included
+<img width="308" height="687" alt="Screenshot 2026-07-10 at 23 39 24" src="https://github.com/user-attachments/assets/927a2823-3859-4678-ae41-c251686ca9bc" /> || <img width="321" height="691" alt="Screenshot 2026-07-10 at 23 40 02" src="https://github.com/user-attachments/assets/a2d7d863-46f9-44c1-935f-ed8dad7fc670" />
+
+
 
 - **Expo React Native mobile app** in `mobile/`
   - Chosen approach: Expo with TypeScript for faster setup, reviewer-friendly
