@@ -4,7 +4,9 @@ Offline-first mobile intake app for field paramedics, with a FastAPI backend inc
 
 ## What Is Included
 
-- **React Native / Expo mobile app** in `mobile/`
+- **Expo React Native mobile app** in `mobile/`
+  - Chosen approach: Expo with TypeScript for faster setup, reviewer-friendly
+    execution, and access to Expo SQLite for offline persistence.
   - Single-screen triage form optimized for fast field intake.
   - Zod + React Hook Form validation.
   - Priority 1 and 2 records use high-visibility hazard styling.
@@ -78,6 +80,33 @@ Run tests:
 cd mobile
 npm test
 ```
+
+### Expo Troubleshooting
+
+Use Node 22 for Expo SDK 51:
+
+```bash
+nvm use 22
+```
+
+If Metro crashes with `EMFILE: too many open files, watch`, install Watchman
+or raise the shell file limit, then restart Metro with a clean cache:
+
+```bash
+cd mobile
+npx expo start --clear
+```
+
+If you are still seeing watcher pressure on macOS, use the project-local Node version pin:
+
+```bash
+cd mobile
+nvm install 22
+nvm use 22
+```
+
+Expo SDK 51 expects `@react-native-community/netinfo@11.3.1`; the dependency
+is pinned to that version to avoid Expo Go compatibility warnings.
 
 ## Offline-First Flow
 

@@ -4,21 +4,25 @@
   "private": true,
   "main": "expo/AppEntry",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "prestart": "node scripts/check-node-version.js",
+    "start": "expo start --clear",
+    "preandroid": "node scripts/check-node-version.js",
+    "android": "expo start --android --clear",
+    "preios": "node scripts/check-node-version.js",
+    "ios": "expo start --ios --clear",
     "test": "jest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.4",
     "@hookform/resolvers": "^3.9.0",
-    "@react-native-community/netinfo": "^11.4.1",
+    "@react-native-community/netinfo": "11.3.1",
     "@react-navigation/native": "^6.1.18",
     "@react-navigation/native-stack": "^6.11.0",
     "@reduxjs/toolkit": "^2.2.7",
     "expo": "^51.0.0",
     "expo-sqlite": "~14.0.6",
+    "expo-status-bar": "~1.12.1",
     "react": "18.2.0",
     "react-hook-form": "^7.53.0",
     "react-native": "0.74.5",
@@ -36,6 +40,9 @@
     "jest-expo": "^51.0.4",
     "react-test-renderer": "18.2.0",
     "typescript": "~5.3.3"
+  },
+  "engines": {
+    "node": ">=20 <23"
   },
   "jest": {
     "preset": "jest-expo",
