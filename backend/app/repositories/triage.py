@@ -1,24 +1,38 @@
+"""Repository objects that isolate database access from business services."""
+
 from uuid import UUID
 
+import structlog
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.triage import TriageRecord, TriageStatus
 from app.schemas.triage import SortDirection, SortField, TriageCreate, TriageUpdate
 
+logger = structlog.get_logger(__name__)
+
 
 class TriageRepository:
+    """Database gateway for triage record persistence."""
+
     def __init__(self, session: AsyncSession) -> None:
+        """Initialize the repository with a request-scoped database session."""
+
         self.session = session
 
     async def create(self, payload: TriageCreate) -> TriageRecord:
+        """Insert a triage record and return the persisted model."""
+
         record = TriageRecord(**payload.model_dump())
         self.session.add(record)
         await self.session.commit()
         await self.session.refresh(record)
+        logger.info("triage_record_inserted", record_id=str(record.id))
         return record
 
     async def get(self, record_id: UUID) -> TriageRecord | None:
+        """Return one triage record by ID, or None when it does not exist."""
+
         return await self.session.get(TriageRecord, record_id)
 
     async def list(
@@ -32,6 +46,8 @@ class TriageRepository:
         sort_by: SortField,
         sort_direction: SortDirection,
     ) -> tuple[list[TriageRecord], int]:
+        """Return filtered triage records and the matching total count."""
+
         query = self._with_filters(
             select(TriageRecord),
             priority=priority,
@@ -55,15 +71,21 @@ class TriageRepository:
         return list(result), total or 0
 
     async def update(self, record: TriageRecord, payload: TriageUpdate) -> TriageRecord:
+        """Apply a partial update to an existing triage record."""
+
         for key, value in payload.model_dump(exclude_unset=True).items():
             setattr(record, key, value)
         await self.session.commit()
         await self.session.refresh(record)
+        logger.info("triage_record_updated", record_id=str(record.id))
         return record
 
     async def delete(self, record: TriageRecord) -> None:
+        """Delete an existing triage record."""
+
         await self.session.delete(record)
         await self.session.commit()
+        logger.info("triage_record_deleted", record_id=str(record.id))
 
     def _with_filters(
         self,
@@ -73,6 +95,8 @@ class TriageRepository:
         status: TriageStatus | None,
         synced: bool | None,
     ) -> Select[tuple[TriageRecord]]:
+        """Apply optional list filters to a SQLAlchemy select statement."""
+
         if priority is not None:
             query = query.where(TriageRecord.priority == priority)
         if status is not None:

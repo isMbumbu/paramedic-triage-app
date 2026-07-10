@@ -1,8 +1,12 @@
+"""Tests for triage record API behavior."""
+
 import pytest
 
 
 @pytest.mark.asyncio
 async def test_create_and_list_triage_record(client):
+    """Creating a record should make it visible in filtered list responses."""
+
     response = await client.post(
         "/triage",
         json={
@@ -28,6 +32,8 @@ async def test_create_and_list_triage_record(client):
 
 @pytest.mark.asyncio
 async def test_rejects_invalid_priority(client):
+    """The API should reject priorities outside the 1-5 triage range."""
+
     response = await client.post(
         "/triage",
         json={
@@ -43,6 +49,8 @@ async def test_rejects_invalid_priority(client):
 
 @pytest.mark.asyncio
 async def test_update_and_delete_triage_record(client):
+    """Records should support partial update and deletion."""
+
     created = await client.post(
         "/triage",
         json={

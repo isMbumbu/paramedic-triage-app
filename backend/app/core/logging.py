@@ -1,9 +1,13 @@
+"""Structured logging configuration for the API process."""
+
 import logging
 
 import structlog
 
 
 def configure_logging(level: str) -> None:
+    """Configure JSON logs for app and dependency loggers."""
+
     logging.basicConfig(level=level, format="%(message)s")
     structlog.configure(
         processors=[

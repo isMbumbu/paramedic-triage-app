@@ -23,6 +23,15 @@ Offline-first mobile intake app for field paramedics, with a FastAPI backend inc
 
 ## Backend
 
+The backend is intentionally structured for review:
+
+- PEP 8-oriented Python with full type hints and focused docstrings.
+- Pydantic v2 request/response schemas for validation and OpenAPI documentation.
+- SQLAlchemy 2.x async ORM models with database constraints and indexes.
+- Route handlers stay thin; business logic lives in services and persistence lives in repositories.
+- Structured JSON logging through `structlog`, including request logging and exception logging.
+- Centralized exception handling for domain errors and unexpected failures.
+
 Run with Docker:
 
 ```bash

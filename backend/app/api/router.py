@@ -1,3 +1,5 @@
+"""Top-level API router composition."""
+
 from fastapi import APIRouter
 
 from app.api.routes.triage import router as triage_router

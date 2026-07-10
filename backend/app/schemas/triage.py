@@ -1,3 +1,5 @@
+"""Pydantic schemas used for triage API validation and serialization."""
+
 from datetime import datetime
 from typing import Generic, Literal, TypeVar
 from uuid import UUID
@@ -12,16 +14,38 @@ T = TypeVar("T")
 
 
 class TriageCreate(BaseModel):
-    patient_name: str = Field(min_length=1, max_length=160)
-    condition_description: str = Field(min_length=1, max_length=5000)
-    priority: int = Field(ge=1, le=5)
-    status: TriageStatus
-    synced: bool = True
+    """Payload accepted when creating a triage record."""
+
+    patient_name: str = Field(
+        min_length=1,
+        max_length=160,
+        examples=["Amina Otieno"],
+        description="Patient name or field identifier when the name is unknown.",
+    )
+    condition_description: str = Field(
+        min_length=1,
+        max_length=5000,
+        examples=["Severe chest pain with shortness of breath."],
+        description="Clinical description captured by the field paramedic.",
+    )
+    priority: int = Field(
+        ge=1,
+        le=5,
+        examples=[1],
+        description="Triage priority from 1 to 5; 1 is life-threatening.",
+    )
+    status: TriageStatus = Field(description="Current transport workflow state.")
+    synced: bool = Field(
+        default=True,
+        description="Whether the source client considers the record synchronized.",
+    )
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class TriageUpdate(BaseModel):
+    """Partial payload accepted when updating a triage record."""
+
     patient_name: str | None = Field(default=None, min_length=1, max_length=160)
     condition_description: str | None = Field(default=None, min_length=1, max_length=5000)
     priority: int | None = Field(default=None, ge=1, le=5)
@@ -32,6 +56,8 @@ class TriageUpdate(BaseModel):
 
 
 class TriageRead(BaseModel):
+    """Triage record returned by the API."""
+
     id: UUID
     patient_name: str
     condition_description: str
@@ -45,15 +71,33 @@ class TriageRead(BaseModel):
 
 
 class PageMeta(BaseModel):
+    """Pagination metadata returned with collection responses."""
+
     page: int
     page_size: int
     total: int
 
 
+class TriageQueryParams(BaseModel):
+    """Reusable query parameters for triage list filtering and sorting."""
+
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=25, ge=1, le=100)
+    priority: int | None = Field(default=None, ge=1, le=5)
+    status: TriageStatus | None = None
+    synced: bool | None = None
+    sort_by: SortField = "created_at"
+    sort_direction: SortDirection = "desc"
+
+
 class TriageListResponse(BaseModel):
+    """Paginated triage record list response."""
+
     data: list[TriageRead]
     meta: PageMeta
 
 
 class ApiResponse(BaseModel, Generic[T]):
+    """Consistent envelope for single-resource responses."""
+
     data: T
