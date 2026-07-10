@@ -8,6 +8,7 @@ Create Date: 2026-07-10
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -20,7 +21,12 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     """Create the triage_records table and supporting indexes."""
 
-    status_enum = sa.Enum("Pending", "In-Transit", name="triagestatus")
+    status_enum = postgresql.ENUM(
+        "Pending",
+        "In-Transit",
+        name="triagestatus",
+        create_type=False,
+    )
     status_enum.create(op.get_bind(), checkfirst=True)
     op.create_table(
         "triage_records",

@@ -29,6 +29,9 @@ export function PrioritySelector({ field }: Props) {
               }
             ]}
           >
+            <Text style={[styles.priorityNumber, { color: priorityStyle.color }]}>
+              P{priority}
+            </Text>
             <Text style={[styles.priorityText, { color: priorityStyle.color }]}>
               {getPriorityLabel(priority)}
             </Text>
@@ -49,12 +52,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 8,
     flexBasis: "31%",
-    minHeight: 56,
+    minHeight: 62,
     justifyContent: "center",
     paddingHorizontal: 8
   },
+  priorityNumber: {
+    fontSize: 18,
+    fontWeight: "900"
+  },
   priorityText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "800",
     textAlign: "center"
   }

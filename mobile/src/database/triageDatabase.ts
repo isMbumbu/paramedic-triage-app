@@ -16,6 +16,7 @@ type TriageRow = {
 };
 
 const databasePromise = SQLite.openDatabaseAsync("triage.db");
+let recoveredInterruptedSyncs = false;
 
 function toRecord(row: TriageRow): TriageRecord {
   return {
@@ -50,6 +51,10 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_triage_sync_state ON triage_records(sync_state);
     CREATE INDEX IF NOT EXISTS idx_triage_priority ON triage_records(priority);
   `);
+  if (!recoveredInterruptedSyncs) {
+    await recoverInterruptedSyncs();
+    recoveredInterruptedSyncs = true;
+  }
 }
 
 export async function insertLocalRecord(values: TriageFormValues): Promise<TriageRecord> {
@@ -92,9 +97,22 @@ export async function listRecords(): Promise<TriageRecord[]> {
 export async function listPendingRecords(): Promise<TriageRecord[]> {
   const db = await databasePromise;
   const rows = await db.getAllAsync<TriageRow>(
-    "SELECT * FROM triage_records WHERE sync_state IN ('pending', 'failed') ORDER BY created_at ASC"
+    "SELECT * FROM triage_records WHERE sync_state IN ('pending', 'failed', 'syncing') ORDER BY created_at ASC"
   );
   return rows.map(toRecord);
+}
+
+export async function recoverInterruptedSyncs() {
+  const db = await databasePromise;
+  await db.runAsync(
+    `UPDATE triage_records
+     SET sync_state = ?, last_sync_error = ?, updated_at = ?
+     WHERE sync_state = ?`,
+    "pending",
+    "Recovered after interrupted sync",
+    new Date().toISOString(),
+    "syncing"
+  );
 }
 
 export async function markSyncing(id: string) {

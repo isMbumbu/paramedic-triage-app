@@ -22,6 +22,7 @@ import { syncPendingRecords } from "../services/sync/syncService";
 import { addRecord, setRecords, setSyncing } from "../store/triageSlice";
 import { AppDispatch, RootState } from "../store/store";
 import { TriageFormValues } from "../types/triage";
+import { getPriorityStyle } from "../utils/priority";
 import { triageSchema } from "../utils/triageValidation";
 
 const defaultValues: TriageFormValues = {
@@ -72,15 +73,32 @@ export function TriageScreen() {
 
   const pendingCount = records.filter((record) => record.syncState === "pending").length;
   const failedCount = records.filter((record) => record.syncState === "failed").length;
+  const syncedCount = records.filter((record) => record.syncState === "synced").length;
+  const criticalCount = records.filter((record) => record.priority <= 2).length;
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["bottom"]}>
+    <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={styles.container}
       >
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.eyebrow}>EMKF FIELD TRIAGE</Text>
+            <Text style={styles.title}>Patient Intake</Text>
+          </View>
+          <View style={styles.criticalPill}>
+            <Text style={styles.criticalPillText}>⚠ {criticalCount} Critical</Text>
+          </View>
+        </View>
+
         <View style={styles.formPanel}>
-          <SyncBanner pendingCount={pendingCount} failedCount={failedCount} syncing={syncing} />
+          <SyncBanner
+            pendingCount={pendingCount}
+            failedCount={failedCount}
+            syncedCount={syncedCount}
+            syncing={syncing}
+          />
 
           <Text style={styles.label}>Patient Name</Text>
           <Controller
@@ -93,6 +111,7 @@ export function TriageScreen() {
                 onChangeText={field.onChange}
                 value={field.value}
                 placeholder="Full name or unknown identifier"
+                placeholderTextColor="#6b7280"
                 style={styles.input}
               />
             )}
@@ -111,6 +130,7 @@ export function TriageScreen() {
                 onChangeText={field.onChange}
                 value={field.value}
                 placeholder="Vitals, symptoms, mechanism of injury"
+                placeholderTextColor="#6b7280"
                 style={[styles.input, styles.textArea]}
               />
             )}
@@ -158,6 +178,7 @@ export function TriageScreen() {
             onPress={handleSubmit(submit)}
             style={[styles.submitButton, isSubmitting && styles.submitDisabled]}
           >
+            <Text style={styles.submitIcon}>✓</Text>
             <Text style={styles.submitText}>Save Triage Record</Text>
           </Pressable>
         </View>
@@ -166,20 +187,58 @@ export function TriageScreen() {
           data={records}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
-          ListHeaderComponent={<Text style={styles.listTitle}>Recent Intake</Text>}
-          renderItem={({ item }) => (
-            <View style={styles.recordRow}>
-              <View style={[styles.priorityBadge, item.priority <= 2 && styles.criticalBadge]}>
-                <Text style={styles.priorityBadgeText}>P{item.priority}</Text>
-              </View>
-              <View style={styles.recordText}>
-                <Text style={styles.recordName}>{item.patientName}</Text>
-                <Text numberOfLines={1} style={styles.recordMeta}>
-                  {item.status} - {item.syncState}
-                </Text>
-              </View>
+          ListHeaderComponent={
+            <View style={styles.listHeader}>
+              <Text style={styles.listTitle}>Recent Intake</Text>
+              <Text style={styles.listCount}>{records.length} local</Text>
             </View>
-          )}
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyIcon}>🗄</Text>
+              <Text style={styles.emptyText}>No local triage records yet</Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const priorityStyle = getPriorityStyle(item.priority);
+            const isCritical = item.priority <= 2;
+            const syncColor =
+              item.syncState === "synced"
+                ? "#047857"
+                : item.syncState === "failed"
+                  ? "#b91c1c"
+                  : item.syncState === "syncing"
+                    ? "#0369a1"
+                    : "#b45309";
+
+            return (
+              <View style={[styles.recordRow, isCritical && styles.criticalRecord]}>
+                <View style={[styles.priorityBadge, { backgroundColor: priorityStyle.backgroundColor }]}>
+                  <Text style={styles.priorityBadgeText}>P{item.priority}</Text>
+                </View>
+                <View style={styles.recordText}>
+                  <View style={styles.recordTopLine}>
+                    <Text numberOfLines={1} style={styles.recordName}>
+                      {item.patientName}
+                    </Text>
+                    <View style={[styles.syncPill, { backgroundColor: syncColor }]}>
+                      <Text style={styles.syncPillText}>{item.syncState.toUpperCase()}</Text>
+                    </View>
+                  </View>
+                  <Text numberOfLines={1} style={styles.recordMeta}>
+                    {item.status} • {item.conditionDescription}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.recordSaved}>
+                    Saved locally {new Date(item.createdAt).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit"
+                    })}
+                    {item.remoteId ? ` • Remote ${item.remoteId}` : ""}
+                  </Text>
+                </View>
+              </View>
+            );
+          }}
         />
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -189,25 +248,58 @@ export function TriageScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#e5e7eb"
+    backgroundColor: "#0f172a"
   },
   container: {
     flex: 1,
     padding: 16,
     gap: 12
   },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingTop: 4
+  },
+  eyebrow: {
+    color: "#fb923c",
+    fontSize: 12,
+    fontWeight: "900"
+  },
+  title: {
+    color: "#f8fafc",
+    fontSize: 28,
+    fontWeight: "900"
+  },
+  criticalPill: {
+    alignItems: "center",
+    backgroundColor: "#b91c1c",
+    borderRadius: 8,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8
+  },
+  criticalPillText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "900"
+  },
   formPanel: {
-    gap: 8
+    backgroundColor: "#f8fafc",
+    borderRadius: 8,
+    gap: 8,
+    padding: 12
   },
   label: {
-    color: "#111827",
+    color: "#0f172a",
     fontSize: 14,
     fontWeight: "800",
     marginTop: 4
   },
   input: {
     backgroundColor: "#ffffff",
-    borderColor: "#9ca3af",
+    borderColor: "#cbd5e1",
     borderRadius: 8,
     borderWidth: 1,
     color: "#111827",
@@ -226,7 +318,7 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   },
   segment: {
-    backgroundColor: "#d1d5db",
+    backgroundColor: "#e2e8f0",
     borderRadius: 8,
     flexDirection: "row",
     padding: 4
@@ -238,7 +330,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10
   },
   segmentActive: {
-    backgroundColor: "#111827"
+    backgroundColor: "#0f172a"
   },
   segmentText: {
     color: "#111827",
@@ -249,8 +341,10 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     alignItems: "center",
-    backgroundColor: "#0f766e",
+    backgroundColor: "#047857",
     borderRadius: 8,
+    flexDirection: "row",
+    gap: 8,
     minHeight: 52,
     justifyContent: "center",
     marginTop: 4
@@ -263,35 +357,67 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "900"
   },
+  submitIcon: {
+    color: "#ffffff",
+    fontSize: 18,
+    fontWeight: "900"
+  },
   list: {
     gap: 8,
     paddingBottom: 24
   },
-  listTitle: {
-    color: "#111827",
-    fontSize: 16,
-    fontWeight: "900",
+  listHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 4
+  },
+  listTitle: {
+    color: "#f8fafc",
+    fontSize: 16,
+    fontWeight: "900"
+  },
+  listCount: {
+    color: "#cbd5e1",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  emptyState: {
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    borderRadius: 8,
+    gap: 6,
+    padding: 18
+  },
+  emptyIcon: {
+    color: "#64748b",
+    fontSize: 20,
+    fontWeight: "900"
+  },
+  emptyText: {
+    color: "#475569",
+    fontWeight: "800"
   },
   recordRow: {
     alignItems: "center",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8fafc",
     borderRadius: 8,
+    borderLeftColor: "#334155",
+    borderLeftWidth: 5,
     flexDirection: "row",
     gap: 10,
-    minHeight: 62,
+    minHeight: 76,
     padding: 10
+  },
+  criticalRecord: {
+    borderLeftColor: "#dc2626"
   },
   priorityBadge: {
     alignItems: "center",
-    backgroundColor: "#374151",
     borderRadius: 8,
-    height: 42,
+    height: 48,
     justifyContent: "center",
-    width: 42
-  },
-  criticalBadge: {
-    backgroundColor: "#991b1b"
+    width: 48
   },
   priorityBadgeText: {
     color: "#ffffff",
@@ -300,14 +426,36 @@ const styles = StyleSheet.create({
   recordText: {
     flex: 1
   },
+  recordTopLine: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8
+  },
   recordName: {
-    color: "#111827",
+    color: "#0f172a",
+    flex: 1,
     fontSize: 15,
     fontWeight: "900"
   },
+  syncPill: {
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3
+  },
+  syncPillText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "900"
+  },
   recordMeta: {
-    color: "#4b5563",
+    color: "#334155",
     fontSize: 13,
     marginTop: 2
+  },
+  recordSaved: {
+    color: "#64748b",
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 3
   }
 });
