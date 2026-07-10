@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 ENV PIP_NO_CACHE_DIR=1
 
 COPY requirements.txt ./
-RUN python -m pip install -r requirements.txt
+RUN python -m pip install --retries 2 --timeout 30 -r requirements.txt
 
 COPY app ./app
 COPY alembic ./alembic

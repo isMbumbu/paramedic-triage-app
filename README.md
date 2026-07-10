@@ -40,6 +40,15 @@ Run with Docker:
 docker compose up --build
 ```
 
+If the build fails with `Network is unreachable` while installing Python
+packages, Docker Desktop cannot reach PyPI from inside the build container. Check
+Docker Desktop networking or your VPN/proxy, then rebuild only the API image:
+
+```bash
+docker compose build --no-cache api
+docker compose up
+```
+
 API health check:
 
 ```bash
