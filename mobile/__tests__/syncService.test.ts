@@ -67,4 +67,19 @@ describe("syncPendingRecords", () => {
     expect(listPendingRecords).not.toHaveBeenCalled();
     expect(uploadTriageRecord).not.toHaveBeenCalled();
   });
+
+  it("marks failed uploads for retry on the next sync pass", async () => {
+    jest.mocked(NetInfo.fetch).mockResolvedValue({
+      isConnected: true,
+      isInternetReachable: true
+    } as never);
+    jest.mocked(listPendingRecords).mockResolvedValue([queuedRecord]);
+    jest.mocked(uploadTriageRecord).mockRejectedValue(new Error("Network timeout"));
+
+    await expect(syncPendingRecords()).resolves.toBe(0);
+
+    expect(markSyncing).toHaveBeenCalledWith("local-1");
+    expect(markFailed).toHaveBeenCalledWith("local-1", "Network timeout");
+    expect(markSynced).not.toHaveBeenCalled();
+  });
 });

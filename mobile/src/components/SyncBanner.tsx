@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { StyleSheet, Text, View } from "react-native";
 
 type Props = {
@@ -10,7 +11,13 @@ type Props = {
 export function SyncBanner({ pendingCount, failedCount, syncedCount, syncing }: Props) {
   const hasQueue = pendingCount > 0 || failedCount > 0;
   const backgroundColor = failedCount > 0 ? "#7f1d1d" : hasQueue ? "#92400e" : "#064e3b";
-  const iconName = syncing ? "sync" : failedCount > 0 ? "alert-octagon" : hasQueue ? "database-clock" : "check-decagram";
+  const iconName = syncing
+    ? "sync"
+    : failedCount > 0
+      ? "alert-octagon"
+      : hasQueue
+        ? "database-clock"
+        : "check-decagram";
   const label = syncing
     ? "Syncing local queue"
     : failedCount > 0
@@ -22,7 +29,7 @@ export function SyncBanner({ pendingCount, failedCount, syncedCount, syncing }: 
   return (
     <View style={[styles.container, { backgroundColor }]}>
       <View style={styles.statusRow}>
-        <Text style={styles.icon}>{iconName === "sync" ? "↻" : iconName === "alert-octagon" ? "⚠" : iconName === "database-clock" ? "🗄" : "✓"}</Text>
+        <MaterialCommunityIcons color="#ffffff" name={iconName} size={20} />
         <Text style={styles.text}>{label}</Text>
       </View>
       <View style={styles.metrics}>
@@ -45,11 +52,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 8
-  },
-  icon: {
-    color: "#ffffff",
-    fontSize: 18,
-    fontWeight: "900"
   },
   text: {
     color: "#ffffff",
